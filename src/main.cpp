@@ -132,5 +132,4 @@ void draw3D(const Camera &camera, sf::Shader *shader, const sf::Texture *texture
     glVertexPointer(3, GL_FLOAT, 5*sizeof(GLfloat), basicPlaneVerts);
     glTexCoordPointer(2, GL_FLOAT, 5*sizeof(GLfloat), basicPlaneVerts + 3);
     glDrawArrays(GL_TRIANGLES, 0, 12);
-
 }

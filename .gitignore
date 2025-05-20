@@ -1,4 +1,6 @@
 .idea/
 .vs/
-res/*
+
 cmake-build-debug/*
+
+res/img/*
