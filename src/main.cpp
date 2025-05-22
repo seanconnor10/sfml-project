@@ -14,10 +14,7 @@
 #define PRINT_FPS TRUE
 #define CULL_FACE TRUE
 
-void draw3D(const Camera &camera, sf::Shader *shader, const sf::Texture *texture, const sf::Texture *texture2, int numWalls, std::vector<Plane> planes);
-
-Plane makePlane(float x1, float z1, float x2, float z2, sf::Texture *tex, float y, float height, int h_repeat, int v_repeat);
-Plane makeFloorPlane(float size, sf::Texture *tex, float repeat);
+void draw3D(const Camera &camera, sf::Shader *shader, sf::Texture *texture, sf::Texture *texture2, int numWalls, std::vector<Plane> planes);
 
 int main() {
     sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "My window");
@@ -122,21 +119,18 @@ int main() {
         player.placeCamera(camera);
 
         basicShader.setUniform("lightFactor", global_anim_factor);
-        //if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F)) {
-            basicShader.setUniform("lightPosition", sf::Glsl::Vec3(player.position));
-        //}
+        basicShader.setUniform("lightPosition", sf::Glsl::Vec3(player.position));
         basicShader.setUniform("cameraPosition", sf::Glsl::Vec3(camera.position));
 
         //window.setActive(true);
         draw3D(camera, &basicShader, &testTexture, &testTexture2, planes.size(), planes);
-        //draw3D(camera, &basicShader, &testTexture, &testTexture2, NUM_WALLS, walls);
         //window.setActive(false);
 
         window.display();
     }
 }
 
-void draw3D(const Camera &camera, sf::Shader *shader, const sf::Texture *texture, const sf::Texture *texture2, int numWalls, std::vector<Plane> planes) {
+void draw3D(const Camera &camera, sf::Shader *shader, sf::Texture *texture, sf::Texture *texture2, int numWalls, std::vector<Plane> planes) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glMatrixMode(GL_PROJECTION);
@@ -158,13 +152,20 @@ void draw3D(const Camera &camera, sf::Shader *shader, const sf::Texture *texture
 
     //Plane2
     for (int i=0; i<numWalls; i++) {
-        if (previousTex != planes[i].tex) {
+        auto v = planes[i].vertices;
+        /*if (previousTex != planes[i].tex && planes[i].tex != nullptr) {
             sf::Texture::bind(planes[i].tex); //Replace this with something faster
             previousTex = planes[i].tex;
+        }*/
+        const bool isFloor = (v[3] == 0 && v[4] == 1 && v[5] == 0); //Is Floor is normal points up
+        sf::Texture *tex = isFloor ? texture2 : texture;
+        if (previousTex != tex) {
+            sf::Texture::bind(tex); //Replace this with something faster
+            previousTex = tex;
         }
-        glVertexPointer(3, GL_FLOAT, 8*sizeof(GLfloat), planes[i].vertices);
-        glNormalPointer(GL_FLOAT, 8*sizeof(GLfloat), planes[i].vertices + 3);
-        glTexCoordPointer(2, GL_FLOAT, 8*sizeof(GLfloat), planes[i].vertices + 6);
+        glVertexPointer(3, GL_FLOAT, 8*sizeof(GLfloat), v);
+        glNormalPointer(GL_FLOAT, 8*sizeof(GLfloat), v + 3);
+        glTexCoordPointer(2, GL_FLOAT, 8*sizeof(GLfloat), v + 6);
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
 }

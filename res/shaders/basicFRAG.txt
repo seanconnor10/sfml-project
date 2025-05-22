@@ -9,22 +9,86 @@ uniform vec3 cameraPosition;
 
 varying in vec3 vertLight;
 
+varying in vec3 vec3WorldCoord;
+varying in vec3 vec3VertNormal;
+
+vec3 blinnPhong(in vec3 v3Normal, in vec3 v3LightDirection, in vec3 v3ViewDirection, in vec3 v3LightIrradiance, in vec3 v3DiffuseColour, in vec3 v3SpecularColour, in float fRoughness);
+vec3 lightFalloff(in vec3 v3LightIntensity, in float fFalloff, in vec3 v3LightPosition, in vec3 v3Position);
+
 void main()
 {
     vec4 color = texture2D(tex,gl_TexCoord[0].st);
 
-	vec3 fragLight = vertLight;
+    //Depth fog / light
+    float light = lightFactor;
+
+    float zDepth = gl_FragCoord.z /gl_FragCoord.w / 5000.0;
+    float fogFactor = zDepth*12 - 0.1;
+    fogFactor = clamp(fogFactor, 0.2, 0.5);
+
+    if (light<0.0) light = 0.0;
+    if (light>1.0) light = 1.0;
+
+    light *= 1.1;
+    light += 0.2;
+
+    light *= (1.0-fogFactor);
+
+    //Fragment based Light
+    vec3 v3ViewDirection =  normalize(cameraPosition - vec3WorldCoord);
+    vec3 v3LightDirection = normalize(lightPosition - vec3WorldCoord);
+
+    vec3 lightIntensity = vec3(0.5, 0.45, 0.4);
+    float fallOff = 0.00001;
+
+    vec3 v3LightIrradiance = lightFalloff(lightIntensity, fallOff, lightPosition, vec3WorldCoord);
+
+    vec3 fragLight = blinnPhong(vec3VertNormal, v3LightDirection, v3ViewDirection, v3LightIrradiance, vec3(1, 1, 1), vec3(1, 1, 1), 0.5);
+    fragLight[0] = max(fragLight[0], 0.1);
+    fragLight[1] = max(fragLight[1], 0.1f);
+    fragLight[2] = max(fragLight[2], 0.1f);
 
     // Determine Color
-    int shades = 16;
+    int shades = 10;
 
-    color[0] = fragLight[0]*color[0];//*light;//*light;
-    color[1] = fragLight[1]*color[1];//*light;//*light*0.75;
-    color[2] = fragLight[2]*color[2];//*light;//*0.75;
+    color[0] = fragLight[0]*color[0]*light;//*light;
+    color[1] = fragLight[1]*color[1]*light;//*light*0.75;
+    color[2] = fragLight[2]*color[2]*light;//*0.75;
 
     color[0] = floor(color[0]*shades)/shades;
     color[1] = floor(color[1]*shades)/shades;
     color[2] = floor(color[2]*shades)/shades;
 
     gl_FragColor = color;
+}
+
+vec3 blinnPhong(in vec3 v3Normal, in vec3 v3LightDirection, in vec3 v3ViewDirection, in vec3 v3LightIrradiance, in vec3 v3DiffuseColour, in vec3 v3SpecularColour, in float fRoughness)
+{
+    // Get diffuse component
+    vec3 v3Diffuse = v3DiffuseColour;
+
+    // Calculate half vector
+    vec3 v3HalfVector = normalize(v3ViewDirection + v3LightDirection);
+
+    // Calculate specular component
+    vec3 v3Specular = pow(max(dot(v3Normal, v3HalfVector), 0.0f), fRoughness) * v3SpecularColour;
+
+    // Combine diffuse and specular
+    vec3 v3RetColour = v3Diffuse + v3Specular;
+
+    // Multiply by view angle
+    v3RetColour *= max(dot(v3Normal, v3LightDirection), 0.0f);
+
+    // Combine with incoming light value
+    v3RetColour *= v3LightIrradiance;
+    return v3RetColour;
+}
+
+vec3 lightFalloff(in vec3 v3LightIntensity, in float fFalloff, in vec3 v3LightPosition, in vec3 v3Position)
+{
+    // Calculate distance from light
+    float fDist = distance(v3LightPosition, v3Position);
+
+    // Return falloff
+    return v3LightIntensity / (fFalloff * fDist * fDist);
 }
