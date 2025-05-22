@@ -1,3 +1,4 @@
+#include <cmath>
 #include <iostream>
 #include <optional>
 
@@ -6,11 +7,22 @@
 
 #include "Camera.h"
 #include "Player.h"
+#include "util.h"
+#include "draw_helpers.h"
 
-void draw3D(const Camera &camera, sf::Shader *shader, const sf::Texture *texture);
+#define TEX_FILTER GL_LINEAR
+#define PRINT_FPS TRUE
+#define CULL_FACE TRUE
+
+void draw3D(const Camera &camera, sf::Shader *shader, const sf::Texture *texture, const sf::Texture *texture2, int numWalls, std::vector<Plane> planes);
+
+Plane makePlane(float x1, float z1, float x2, float z2, sf::Texture *tex, float y, float height, int h_repeat, int v_repeat);
+Plane makeFloorPlane(float size, sf::Texture *tex, float repeat);
 
 int main() {
     sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "My window");
+
+    std::cout << "OpenGLVersion: " << window.getSettings().majorVersion << "." << window.getSettings().minorVersion << std::endl;
 
     if (!window.setActive(true)) {
         std::cout << "Failed to activate Window";
@@ -24,37 +36,76 @@ int main() {
     }
 
     sf::Texture testTexture;
-    if (!testTexture.loadFromFile("../res/img/pixelwood.png")) {
+    if (!testTexture.loadFromFile("../res/img/hex_steel.png")) {
+        std::cout << "Failed to load texture";
+        return EXIT_FAILURE;
+    }
+    sf::Texture testTexture2;
+    if (!testTexture2.loadFromFile("../res/img/pixelwood.png")) {
         std::cout << "Failed to load texture";
         return EXIT_FAILURE;
     }
 
-    sf::Texture::bind(&testTexture);
+    glEnable(GL_DEPTH_TEST);
+    if (CULL_FACE) {
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+    }
+
     sf::Shader::bind(&basicShader);
-    basicShader.setUniform("lightFactor", 1.0f );
 
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glEnableClientState(GL_NORMAL_ARRAY);
 
-    glDisableClientState(GL_NORMAL_ARRAY);
     glDisableClientState(GL_COLOR_ARRAY);
 
+    sf::Texture::bind(&testTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, TEX_FILTER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, TEX_FILTER);
 
-    glEnable(GL_DEPTH_TEST);
+    sf::Texture::bind(&testTexture2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, TEX_FILTER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, TEX_FILTER);
 
-    Player player = {{0.f, 0.f, 0.f}, {0.f, 0.f}};
+    Player player = {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}};
     Camera camera = {player.position, player.rotation, 1.f};
 
     sf::Clock clock;
     bool running = true;
+    float global_anim_factor = 0.f;
+    float global_time_elapsed = 0.f;
+
+     //diSector Map load
+    /*std::vector<TwoPoints> pairs = makeWallSet("../res/cavern.txt");
+    std::cout << "LOADED MAP WITH " << pairs.size() << " WALLS" << std::endl;
+    const int NUM_WALLS = pairs.size() + 1;
+    std::vector<Plane> planes;
+    for (int i=0; i < NUM_WALLS - 1; i++) {
+        auto [x1, z1, x2, z2] = pairs.at(i);
+        planes.push_back(makePlane(x1, z1, x2, z2, &testTexture, 0, 30, 1, 1));
+    }*/
+
+    //TrenchBroom Map Load
+    //PlaneArray planeArray = loadMap("../res/test.map", &testTexture);
+    //std::cout << "LOADED MAP WITH " << planeArray.size << " WALLS" << std::endl;
+    std::vector<Plane> planes = loadMap("../res/test.map", &testTexture);
+    std::cout << "LOADED MAP WITH " << planes.size() << " WALLS" << std::endl;
+
     while (running)
     {
-        sf::Time timeElapsed = clock.restart();
-        float deltaTime = timeElapsed.asSeconds();
-        std::cout  << 1.f / deltaTime << std::endl;
+        float deltaTime = clock.restart().asSeconds();
+        if (PRINT_FPS) {
+            std::cout  << 1.f / deltaTime << std::endl;
+        }
+
+        global_time_elapsed += deltaTime;
+        global_anim_factor = abs(std::cos(global_time_elapsed));
+
         // check all the window's events that were triggered since the last iteration of the loop
         while (const std::optional event = window.pollEvent())
         {
@@ -70,15 +121,22 @@ int main() {
         player.step(deltaTime);
         player.placeCamera(camera);
 
+        basicShader.setUniform("lightFactor", global_anim_factor);
+        //if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::F)) {
+            basicShader.setUniform("lightPosition", sf::Glsl::Vec3(player.position));
+        //}
+        basicShader.setUniform("cameraPosition", sf::Glsl::Vec3(camera.position));
+
         //window.setActive(true);
-        draw3D(camera, &basicShader, &testTexture);
+        draw3D(camera, &basicShader, &testTexture, &testTexture2, planes.size(), planes);
+        //draw3D(camera, &basicShader, &testTexture, &testTexture2, NUM_WALLS, walls);
         //window.setActive(false);
 
         window.display();
     }
 }
 
-void draw3D(const Camera &camera, sf::Shader *shader, const sf::Texture *texture) {
+void draw3D(const Camera &camera, sf::Shader *shader, const sf::Texture *texture, const sf::Texture *texture2, int numWalls, std::vector<Plane> planes) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glMatrixMode(GL_PROJECTION);
@@ -90,46 +148,23 @@ void draw3D(const Camera &camera, sf::Shader *shader, const sf::Texture *texture
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    glRotatef(camera.rotation.y, 0.f, 0.f, 1.f);
+    glRotatef(camera.rotation.z, 0.f, 0.f, 1.f);
+    glRotatef(camera.rotation.y, 1.f, 0.f, 0.f);
     glRotatef(camera.rotation.x, 0.f, 1.f, 0.f);
     glTranslatef(-camera.position.x, -camera.position.y, -camera.position.z);
 
-    const GLfloat basicPlaneVerts[] = {
-        0, -10, -10, 0,0,
-        0, -10,  10, 0,1,
-        0,  10, -10, 1,0,
 
-        0,  10,  10, 1,1,
-        0, -10,  10, 0,1,
-        0,  10, -10, 1,0,
+    sf::Texture *previousTex = nullptr;
 
-        0, -10, -10, 0,0,
-        0, -10,  10, 0,1,
-        0,  10, -10, 1,0,
-
-         0,  10,  10, 1,1,
-         0, -10,  10, 0,1,
-        0,  10, -10, 1,0,
-
-        //Plane 2
-        10, -10, -10, 0,0,
-        10, -10,  10, 0,1,
-        10,  10, -10, 1,0,
-
-        10,  10,  10, 1,1,
-        10, -10,  10, 0,1,
-        10,  10, -10, 1,0,
-
-        10, -10, -10, 0,0,
-        10, -10,  10, 0,1,
-        10,  10, -10, 1,0,
-
-        10,  10,  10, 1,1,
-        10, -10,  10, 0,1,
-        10,  10, -10, 1,0
-    };
-
-    glVertexPointer(3, GL_FLOAT, 5*sizeof(GLfloat), basicPlaneVerts);
-    glTexCoordPointer(2, GL_FLOAT, 5*sizeof(GLfloat), basicPlaneVerts + 3);
-    glDrawArrays(GL_TRIANGLES, 0, 12);
+    //Plane2
+    for (int i=0; i<numWalls; i++) {
+        if (previousTex != planes[i].tex) {
+            sf::Texture::bind(planes[i].tex); //Replace this with something faster
+            previousTex = planes[i].tex;
+        }
+        glVertexPointer(3, GL_FLOAT, 8*sizeof(GLfloat), planes[i].vertices);
+        glNormalPointer(GL_FLOAT, 8*sizeof(GLfloat), planes[i].vertices + 3);
+        glTexCoordPointer(2, GL_FLOAT, 8*sizeof(GLfloat), planes[i].vertices + 6);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    }
 }

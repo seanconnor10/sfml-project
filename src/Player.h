@@ -8,15 +8,16 @@
 class Player {
 
 public:
-    void placeCamera(Camera &camera);
-
     sf::Vector3f position;
-    sf::Vector2f rotation;
+    sf::Vector3f rotation;
+    sf::Vector3f velocity;
 
     void step(float deltaTime);
+    void placeCamera(Camera &camera);
 
 private:
     void controls(float deltaTime);
+    static sf::Vector2f getInputVector();
 };
 
 #endif //PLAYER_H

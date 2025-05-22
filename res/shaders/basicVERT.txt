@@ -1,10 +1,67 @@
 #version 120
 
+varying out vec3 vec3Normal;
+
+varying out vec3 vec3VertexPos;
+
+varying out vec3 vertLight;
+
+uniform vec3 lightPosition;
+uniform vec3 cameraPosition;
+
+vec3 blinnPhong(in vec3 v3Normal, in vec3 v3LightDirection, in vec3 v3ViewDirection, in vec3 v3LightIrradiance, in vec3 v3DiffuseColour, in vec3 v3SpecularColour, in float fRoughness);
+vec3 lightFalloff(in vec3 v3LightIntensity, in float fFalloff, in vec3 v3LightPosition, in vec3 v3Position);
 
 void main() {
 	gl_TexCoord[0] = gl_MultiTexCoord0;
 
-	vec4 v = vec4(gl_Vertex);
+	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
 
-	gl_Position = gl_ModelViewProjectionMatrix * v;
+    vec3VertexPos = gl_Vertex.xyz / gl_Vertex.w;
+    vec3Normal = normalize(gl_Normal);
+
+    //Vert Light
+    vec3 v3ViewDirection =  normalize(cameraPosition - vec3VertexPos);
+    vec3 v3LightDirection = normalize(lightPosition - vec3VertexPos);
+
+    vec3 lightIntensity = vec3(1, 1, 1);
+    float fallOff = 0.001;
+
+    vec3 v3LightIrradiance = lightFalloff(lightIntensity, fallOff, lightPosition, vec3VertexPos);
+
+    vertLight = blinnPhong(vec3Normal, v3LightDirection, v3ViewDirection, v3LightIrradiance, vec3(0.5, 0.5, 0.8), vec3(1, 1, 1), 0.5);
+    vertLight[0] = max(vertLight[0], 0.2f);
+    vertLight[1] = max(vertLight[1], 0.2f);
+    vertLight[2] = max(vertLight[2], 0.2f);
+}
+
+vec3 blinnPhong(in vec3 v3Normal, in vec3 v3LightDirection, in vec3 v3ViewDirection, in vec3 v3LightIrradiance, in vec3 v3DiffuseColour, in vec3 v3SpecularColour, in float fRoughness)
+{
+    // Get diffuse component
+    vec3 v3Diffuse = v3DiffuseColour;
+
+    // Calculate half vector
+    vec3 v3HalfVector = normalize(v3ViewDirection + v3LightDirection);
+
+    // Calculate specular component
+    vec3 v3Specular = pow(max(dot(v3Normal, v3HalfVector), 0.0f), fRoughness) * v3SpecularColour;
+
+    // Combine diffuse and specular
+    vec3 v3RetColour = v3Diffuse + v3Specular;
+
+    // Multiply by view angle
+    v3RetColour *= max(dot(v3Normal, v3LightDirection), 0.0f);
+
+    // Combine with incoming light value
+    v3RetColour *= v3LightIrradiance;
+    return v3RetColour;
+}
+
+vec3 lightFalloff(in vec3 v3LightIntensity, in float fFalloff, in vec3 v3LightPosition, in vec3 v3Position)
+{
+    // Calculate distance from light
+    float fDist = distance(v3LightPosition, v3Position);
+
+    // Return falloff
+    return v3LightIntensity / (fFalloff * fDist * fDist);
 }

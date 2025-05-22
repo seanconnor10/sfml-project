@@ -7,7 +7,7 @@
 class Camera {
 public:
     sf::Vector3f position;
-    sf::Vector2f rotation;
+    sf::Vector3f rotation;
     float fov = 1.f;
 };
 
