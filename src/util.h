@@ -4,7 +4,7 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include "draw_helpers.h"
+#include "plane.h"
 
 typedef struct {
     float x1;
@@ -99,8 +99,8 @@ inline std::vector<Plane> loadMap(const std::string &filepath, sf::Texture *text
                 z2 = std::stof(tokens[12])  * SCALE;
                 y =  std::stof(tokens[3]) * SCALE;
 
-                h_repeat = std::stof(tokens[19]);
-                v_repeat = std::stof(tokens[20]);
+                h_repeat = std::stof(tokens[19]) * 4;
+                v_repeat = std::stof(tokens[20]) * 4;
 
                 planes.push_back(makeFloorPlane(x1,z1, x2,z2, texture, y, h_repeat, v_repeat));
 

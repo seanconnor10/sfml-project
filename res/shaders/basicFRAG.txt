@@ -1,10 +1,18 @@
 #version 120
 
+//For improved
+#define M_RCPPI 0.31830988618379067153776752674503f
+#define M_PI 3.1415926535897932384626433832795f
+
 uniform sampler2D tex;
 
 uniform float lightFactor;
 
-uniform vec3 lightPosition;
+#define NUM_POINT_LIGHTS 3
+uniform vec3 lightPosition[NUM_POINT_LIGHTS];
+uniform vec3 lightColor[NUM_POINT_LIGHTS];
+uniform float lightFalloffFactor[NUM_POINT_LIGHTS];
+
 uniform vec3 cameraPosition;
 
 varying in vec3 vertLight;
@@ -34,22 +42,27 @@ void main()
 
     light *= (1.0-fogFactor);
 
+    light = max(light, 0.3);
+
     //Fragment based Light
     vec3 v3ViewDirection =  normalize(cameraPosition - vec3WorldCoord);
-    vec3 v3LightDirection = normalize(lightPosition - vec3WorldCoord);
 
-    vec3 lightIntensity = vec3(0.5, 0.45, 0.4);
-    float fallOff = 0.00001;
+    vec3 fragLight = vec3(0,0,0);
 
-    vec3 v3LightIrradiance = lightFalloff(lightIntensity, fallOff, lightPosition, vec3WorldCoord);
+    for (int i=0; i<NUM_POINT_LIGHTS; i++) {
+        float fallOff = 0.00005; //lightFalloffFactor[i];
+        vec3 v3LightDirection = normalize( lightPosition[i]- vec3WorldCoord);
+        vec3 v3LightIrradiance = lightFalloff(lightColor[i], fallOff, lightPosition[i], vec3WorldCoord);
+        fragLight += blinnPhong(vec3VertNormal, v3LightDirection, v3ViewDirection, v3LightIrradiance, vec3(1, 1, 1), vec3(1, 1, 1), 0.5);
+    }
 
-    vec3 fragLight = blinnPhong(vec3VertNormal, v3LightDirection, v3ViewDirection, v3LightIrradiance, vec3(1, 1, 1), vec3(1, 1, 1), 0.5);
-    fragLight[0] = max(fragLight[0], 0.1);
-    fragLight[1] = max(fragLight[1], 0.1f);
-    fragLight[2] = max(fragLight[2], 0.1f);
+    //Minimum Light Value
+    fragLight[0] = max(fragLight[0], 0.4f);
+    fragLight[1] = max(fragLight[1], 0.4f);
+    fragLight[2] = max(fragLight[2], 0.4f);
 
     // Determine Color
-    int shades = 10;
+    int shades = 8;
 
     color[0] = fragLight[0]*color[0]*light;//*light;
     color[1] = fragLight[1]*color[1]*light;//*light*0.75;
@@ -72,6 +85,10 @@ vec3 blinnPhong(in vec3 v3Normal, in vec3 v3LightDirection, in vec3 v3ViewDirect
 
     // Calculate specular component
     vec3 v3Specular = pow(max(dot(v3Normal, v3HalfVector), 0.0f), fRoughness) * v3SpecularColour;
+
+    // Normalise
+    v3Diffuse *= M_RCPPI;
+    v3Specular *= (fRoughness + 8.0f) / (8.0f * M_PI);
 
     // Combine diffuse and specular
     vec3 v3RetColour = v3Diffuse + v3Specular;

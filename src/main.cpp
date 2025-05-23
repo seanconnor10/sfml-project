@@ -6,18 +6,19 @@
 #include <SFML/OpenGL.hpp>
 
 #include "Camera.h"
+#include "gl_light.h"
 #include "Player.h"
 #include "util.h"
-#include "draw_helpers.h"
+#include "plane.h"
 
-#define TEX_FILTER GL_LINEAR
+#define TEX_FILTER GL_NEAREST
 #define PRINT_FPS TRUE
 #define CULL_FACE TRUE
 
 void draw3D(const Camera &camera, sf::Shader *shader, sf::Texture *texture, sf::Texture *texture2, int numWalls, std::vector<Plane> planes);
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "My window");
+    sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "My window", sf::Style::Default, sf::State::Fullscreen);
 
     std::cout << "OpenGLVersion: " << window.getSettings().majorVersion << "." << window.getSettings().minorVersion << std::endl;
 
@@ -27,18 +28,18 @@ int main() {
     }
 
     sf::Shader basicShader;
-    if (!basicShader.loadFromFile("../res/shaders/basicVERT.txt", "../res/shaders/basicFRAG.txt")) {
+    if (!basicShader.loadFromFile("res/shaders/basicVERT.txt", "res/shaders/basicFRAG.txt")) {
         std::cout << "Failed to load shader";
         return EXIT_FAILURE;
     }
 
     sf::Texture testTexture;
-    if (!testTexture.loadFromFile("../res/img/hex_steel.png")) {
+    if (!testTexture.loadFromFile("res/img/clay_wall.png")) {
         std::cout << "Failed to load texture";
         return EXIT_FAILURE;
     }
     sf::Texture testTexture2;
-    if (!testTexture2.loadFromFile("../res/img/pixelwood.png")) {
+    if (!testTexture2.loadFromFile("res/img/house.png")) {
         std::cout << "Failed to load texture";
         return EXIT_FAILURE;
     }
@@ -78,7 +79,7 @@ int main() {
     float global_time_elapsed = 0.f;
 
      //diSector Map load
-    /*std::vector<TwoPoints> pairs = makeWallSet("../res/cavern.txt");
+    /*std::vector<TwoPoints> pairs = makeWallSet("res/cavern.txt");
     std::cout << "LOADED MAP WITH " << pairs.size() << " WALLS" << std::endl;
     const int NUM_WALLS = pairs.size() + 1;
     std::vector<Plane> planes;
@@ -88,9 +89,9 @@ int main() {
     }*/
 
     //TrenchBroom Map Load
-    //PlaneArray planeArray = loadMap("../res/test.map", &testTexture);
+    //PlaneArray planeArray = loadMap("res/test.map", &testTexture);
     //std::cout << "LOADED MAP WITH " << planeArray.size << " WALLS" << std::endl;
-    std::vector<Plane> planes = loadMap("../res/test.map", &testTexture);
+    std::vector<Plane> planes = loadMap("res/test.map", &testTexture);
     std::cout << "LOADED MAP WITH " << planes.size() << " WALLS" << std::endl;
 
     while (running)
@@ -119,8 +120,22 @@ int main() {
         player.placeCamera(camera);
 
         basicShader.setUniform("lightFactor", global_anim_factor);
-        basicShader.setUniform("lightPosition", sf::Glsl::Vec3(player.position));
+        //basicShader.setUniform("lightPosition[0]", sf::Glsl::Vec3(player.position));
+        //basicShader.setUniform("lightPosition[1]", sf::Glsl::Vec3(-200, 20, -10));
+        //basicShader.setUniform("lightPosition[2]", sf::Glsl::Vec3(0, 5, 0));
         basicShader.setUniform("cameraPosition", sf::Glsl::Vec3(camera.position));
+
+        constexpr int NUM_POINT_LIGHTS = 3;
+        gl_Point_Light pointLights[NUM_POINT_LIGHTS] = {
+            {player.position,                       sf::Glsl::Vec3(1,1,1), 0.1 },
+            {sf::Glsl::Vec3(-200, 20, -10),   sf::Glsl::Vec3(1,1,1), 0.1 },
+            {sf::Glsl::Vec3(0, 5, 0),         sf::Glsl::Vec3(1,1,1), 0.1 }
+        };
+        for (int i=0; i<NUM_POINT_LIGHTS; i++) {
+            basicShader.setUniform("lightPosition[" + std::to_string(i) + "]", pointLights[i].position);
+            basicShader.setUniform("lightColor[" + std::to_string(i) + "]", pointLights[i].color);
+            basicShader.setUniform("lightFalloff[" + std::to_string(i) + "]", pointLights[i].falloffFactor);
+        }
 
         //window.setActive(true);
         draw3D(camera, &basicShader, &testTexture, &testTexture2, planes.size(), planes);

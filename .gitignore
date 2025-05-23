@@ -1,6 +1,9 @@
 .idea/
 .vs/
 
-cmake-build-debug/*
+out/
 
-res/img/*
+cmake-build-debug/
+cmake-build-release/
+
+res/img/

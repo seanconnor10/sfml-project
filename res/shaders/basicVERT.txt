@@ -6,14 +6,12 @@ varying out vec3 vec3VertexPos;
 
 varying out vec3 vertLight;
 
-uniform vec3 lightPosition;
-uniform vec3 cameraPosition;
-
 varying out vec3 vec3WorldCoord;
 varying out vec3 vec3VertNormal;
 
 void main() {
 	gl_TexCoord[0] = gl_MultiTexCoord0;
+
 
 	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
 
